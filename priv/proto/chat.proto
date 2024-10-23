@@ -1,0 +1,28 @@
+syntax = "proto2";
+
+package chat;
+
+message chat {
+    oneof msg {
+        join        join        = 1;
+        part        part        = 2;
+        channel_msg channel_msg = 3;
+        sync        sync        = 4;
+    }
+}
+
+message join {
+    optional string handle = 1;
+}
+
+message part {
+}
+
+message channel_msg {
+    optional string handle = 1;
+    optional string text = 2;
+}
+
+message sync {
+    repeated string handles = 1;
+}
