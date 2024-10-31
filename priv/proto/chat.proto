@@ -1,4 +1,4 @@
-syntax = "proto2";
+syntax = "proto3";
 
 package chat;
 
@@ -12,15 +12,15 @@ message chat {
 }
 
 message join {
-    optional string handle = 1;
+    string handle = 1;
 }
 
 message part {
 }
 
 message channel_msg {
-    optional string handle = 1;
-    optional string text = 2;
+    string handle = 1;
+    string text = 2;
 }
 
 message sync {
