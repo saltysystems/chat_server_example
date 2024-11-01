@@ -7,9 +7,10 @@
    [kernel,
     stdlib
    ]},
-  {env,[]},
+  {env,[
+    {overworld, #{ prefix => 101 }}
+  ]},
   {modules, []},
-
   {licenses, ["Apache-2.0"]},
   {links, []}
  ]}.
