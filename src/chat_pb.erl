@@ -124,7 +124,14 @@ encode_msg_join(Msg, TrUserData) -> encode_msg_join(Msg, <<>>, TrUserData).
 
 encode_msg_join(#{} = M, Bin, TrUserData) ->
     case M of
-        #{handle := F1} -> begin TrF1 = id(F1, TrUserData), e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData) end;
+        #{handle := F1} ->
+            begin
+                TrF1 = id(F1, TrUserData),
+                case is_empty_string(TrF1) of
+                    true -> Bin;
+                    false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
+                end
+            end;
         _ -> Bin
     end.
 
@@ -135,11 +142,25 @@ encode_msg_channel_msg(Msg, TrUserData) -> encode_msg_channel_msg(Msg, <<>>, TrU
 
 encode_msg_channel_msg(#{} = M, Bin, TrUserData) ->
     B1 = case M of
-             #{handle := F1} -> begin TrF1 = id(F1, TrUserData), e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData) end;
+             #{handle := F1} ->
+                 begin
+                     TrF1 = id(F1, TrUserData),
+                     case is_empty_string(TrF1) of
+                         true -> Bin;
+                         false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
+                     end
+                 end;
              _ -> Bin
          end,
     case M of
-        #{text := F2} -> begin TrF2 = id(F2, TrUserData), e_type_string(TrF2, <<B1/binary, 18>>, TrUserData) end;
+        #{text := F2} ->
+            begin
+                TrF2 = id(F2, TrUserData),
+                case is_empty_string(TrF2) of
+                    true -> B1;
+                    false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
+                end
+            end;
         _ -> B1
     end.
 
@@ -272,6 +293,22 @@ e_varint(N, Bin) when N =< 127 -> <<Bin/binary, N>>;
 e_varint(N, Bin) ->
     Bin2 = <<Bin/binary, (N band 127 bor 128)>>,
     e_varint(N bsr 7, Bin2).
+
+is_empty_string("") -> true;
+is_empty_string(<<>>) -> true;
+is_empty_string(L) when is_list(L) -> not string_has_chars(L);
+is_empty_string(B) when is_binary(B) -> false.
+
+string_has_chars([C | _]) when is_integer(C) -> true;
+string_has_chars([H | T]) ->
+    case string_has_chars(H) of
+        true -> true;
+        false -> string_has_chars(T)
+    end;
+string_has_chars(B) when is_binary(B), byte_size(B) =/= 0 -> true;
+string_has_chars(C) when is_integer(C) -> true;
+string_has_chars(<<>>) -> false;
+string_has_chars([]) -> false.
 
 
 decode_msg(Bin, MsgName) when is_binary(Bin) -> decode_msg(Bin, MsgName, []).
@@ -418,14 +455,10 @@ skip_32_chat(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> dfp_read_fie
 
 skip_64_chat(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> dfp_read_field_def_chat(Rest, Z1, Z2, F, F@_1, TrUserData).
 
-decode_msg_join(Bin, TrUserData) -> dfp_read_field_def_join(Bin, 0, 0, 0, id('$undef', TrUserData), TrUserData).
+decode_msg_join(Bin, TrUserData) -> dfp_read_field_def_join(Bin, 0, 0, 0, id([], TrUserData), TrUserData).
 
 dfp_read_field_def_join(<<10, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> d_field_join_handle(Rest, Z1, Z2, F, F@_1, TrUserData);
-dfp_read_field_def_join(<<>>, 0, 0, _, F@_1, _) ->
-    S1 = #{},
-    if F@_1 == '$undef' -> S1;
-       true -> S1#{handle => F@_1}
-    end;
+dfp_read_field_def_join(<<>>, 0, 0, _, F@_1, _) -> #{handle => F@_1};
 dfp_read_field_def_join(Other, Z1, Z2, F, F@_1, TrUserData) -> dg_read_field_def_join(Other, Z1, Z2, F, F@_1, TrUserData).
 
 dg_read_field_def_join(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 32 - 7 -> dg_read_field_def_join(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
@@ -442,11 +475,7 @@ dg_read_field_def_join(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, TrUserData) -
                 5 -> skip_32_join(Rest, 0, 0, Key bsr 3, F@_1, TrUserData)
             end
     end;
-dg_read_field_def_join(<<>>, 0, 0, _, F@_1, _) ->
-    S1 = #{},
-    if F@_1 == '$undef' -> S1;
-       true -> S1#{handle => F@_1}
-    end.
+dg_read_field_def_join(<<>>, 0, 0, _, F@_1, _) -> #{handle => F@_1}.
 
 d_field_join_handle(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> d_field_join_handle(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
 d_field_join_handle(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, TrUserData) ->
@@ -504,18 +533,11 @@ skip_32_part(<<_:32, Rest/binary>>, Z1, Z2, F, TrUserData) -> dfp_read_field_def
 
 skip_64_part(<<_:64, Rest/binary>>, Z1, Z2, F, TrUserData) -> dfp_read_field_def_part(Rest, Z1, Z2, F, TrUserData).
 
-decode_msg_channel_msg(Bin, TrUserData) -> dfp_read_field_def_channel_msg(Bin, 0, 0, 0, id('$undef', TrUserData), id('$undef', TrUserData), TrUserData).
+decode_msg_channel_msg(Bin, TrUserData) -> dfp_read_field_def_channel_msg(Bin, 0, 0, 0, id([], TrUserData), id([], TrUserData), TrUserData).
 
 dfp_read_field_def_channel_msg(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> d_field_channel_msg_handle(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 dfp_read_field_def_channel_msg(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> d_field_channel_msg_text(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-dfp_read_field_def_channel_msg(<<>>, 0, 0, _, F@_1, F@_2, _) ->
-    S1 = #{},
-    S2 = if F@_1 == '$undef' -> S1;
-            true -> S1#{handle => F@_1}
-         end,
-    if F@_2 == '$undef' -> S2;
-       true -> S2#{text => F@_2}
-    end;
+dfp_read_field_def_channel_msg(<<>>, 0, 0, _, F@_1, F@_2, _) -> #{handle => F@_1, text => F@_2};
 dfp_read_field_def_channel_msg(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dg_read_field_def_channel_msg(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
 dg_read_field_def_channel_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> dg_read_field_def_channel_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
@@ -533,14 +555,7 @@ dg_read_field_def_channel_msg(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, 
                 5 -> skip_32_channel_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
             end
     end;
-dg_read_field_def_channel_msg(<<>>, 0, 0, _, F@_1, F@_2, _) ->
-    S1 = #{},
-    S2 = if F@_1 == '$undef' -> S1;
-            true -> S1#{handle => F@_1}
-         end,
-    if F@_2 == '$undef' -> S2;
-       true -> S2#{text => F@_2}
-    end.
+dg_read_field_def_channel_msg(<<>>, 0, 0, _, F@_1, F@_2, _) -> #{handle => F@_1, text => F@_2}.
 
 d_field_channel_msg_handle(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> d_field_channel_msg_handle(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
 d_field_channel_msg_handle(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
